@@ -346,6 +346,8 @@ class LiveTrading:
         """Fetch market data from API"""
         try:
             url = "https://data.alpaca.markets/v2/stocks/quotes/latest?symbols=UVIX&feed=iex"
+            url2 = "https://data.alpaca.markets/v2/stocks/bars/latest?symbols=UVIX&feed=iex"
+
 
             headers = {
                 "accept": "application/json",
@@ -355,8 +357,11 @@ class LiveTrading:
 
             print("Fetching data from Alpaca...")
             response = requests.get(url, headers=headers)
+            response2 = requests.get(url2, headers=headers)
             quotes = response.json()["quotes"]["UVIX"]
+            quotes2 = response2.json()["bars"]["UVIX"]
             print("Received quotes:", quotes)
+            print("Received quotes2:", quotes2)
 
             bid_price = quotes["bp"]
             ask_price = quotes["ap"]
@@ -425,6 +430,38 @@ class LiveTrading:
             df_my_data = pd.concat([df_my_data, new_df], ignore_index=True)
             df_my_data.to_csv('analyst.csv', index=False)
 
+            # save bar data to the bar db
+
+            close_price = quotes2["c"]
+            high_price = quotes2["h"]
+            low_price = quotes2["l"]
+            open_price = quotes2["o"]
+            volume = quotes2["v"]
+            utctime = quotes2["t"]
+
+            bar_data = {
+                "close_price": close_price,
+                "high_price": high_price,
+                "low_price": low_price,
+                "open_price": open_price,
+                "volume": volume,
+                "utctime": utctime,
+                "history_time": history_time
+            }
+
+            try:                                  
+                df_my_data = pd.read_csv('bar_data.csv')
+            except FileNotFoundError:
+                # Create a new DataFrame with the same columns as new_data
+                df_my_data = pd.DataFrame(columns=bar_data.keys())
+
+
+            new_data2 = pd.DataFrame([bar_data])
+            df_new_data = pd.concat([df_my_data, new_data2], ignore_index=True)
+            df_new_data.to_csv('bar_data.csv', index=False)
+            
+            
+
             return new_data
                 
         except Exception as e:
@@ -439,7 +476,7 @@ class LiveTrading:
                 print("Checking market time...")
                 is_market_open = await check_market_time()
                 print(datetime.now())
-                if not is_market_open:
+                if is_market_open:
                     print("Market is closed. Skipping position checks.")
                 else: 
                     print("Market is open")
